@@ -4,6 +4,8 @@ module Cacheable
     # THE KEY MAKER
     #
     # Handles creation of keys for all objects and classes.
+    # Keys generated in hashes { type: :key_type, key: 'key' }
+    # The type is used by the fetcher to minimize computation
     # 
     # CLASS KEYS
     # A class is responsible for expiring instance caches and class method caches
@@ -44,29 +46,33 @@ module Cacheable
       # => "users/model_generation"
       def key_prefix
         [klass.name.tabelize, model_generation].join("/")
+      end
 
       # EXPIRE ON WRITE OR OVERWRITE ON UPDATE
       # => "users/model_generation/user.id/"
       def instance_key(id=nil)
         id ||= object.id unless object.nil?
-        [key_prefix, id.to_s].join("/")
+        { type: :object, key: [key_prefix, id.to_s].join("/") }
       end
 
       # => "users/model_generation/user.id/instance_generation/attribute"
       def attribute_key(att)
-        [instance_key, instance_generation, att].join("/")
+        { type: :attribute, 
+          key: [instance_key, instance_generation, att].join("/") }
       end
 
       # => "users/model_generation/user.id/instance_generation/method
       def method_key(method)
-        [instance_key(object.id), instance_generation, method].join("/")
+        { type: :method, 
+          key: [instance_key(object.id), instance_generation, method].join("/") }
       end
 
       # EXPIRE MODEL UPDATE, NEW MODEL, MODEL DELETE, ETC. 
       # ANY CHANGE TO CLASS
       # => "users/model_generation/method
       def class_method_key(method)
-        [key_prefix, method, args].join("/")
+        { type: :class_method,
+          key: [key_prefix, method, args].join("/") }
       end
 
       # USED FOR MASS EXPIRY
@@ -76,7 +82,8 @@ module Cacheable
 
       # => "users/model_generation/user.id/instance_generation/association_name"
       def association_key(association_name)
-        [instance_key, association_name].join("/")
+        { type: association,
+          key: [instance_key, association_name].join("/") }
       end
     end 
   end
