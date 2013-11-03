@@ -1,54 +1,83 @@
 module Cacheable
   module Keys
 
-    def self.included(base)
-      base.extend(Cacheable::Keys::ClassKeys)
-      base.send :include, Cacheable::Keys::InstanceKeys
-    end
+    # THE KEY MAKER
+    #
+    # Handles creation of keys for all objects and classes.
+    # 
+    # CLASS KEYS
+    # A class is responsible for expiring instance caches and class method caches
+    # class expiry only happens naturally when a model's schema is changed
+    # 
+    # INSTANCE KEYS
+    # Instance object caches (aside from the main key cache) no longer require expiry
+    # since this now happens automatically w/ attribute-dependent generations
+    #
+    # METHOD KEYS
+    # Method keys no longer include arguments. Instead, the cache itself 
+    # will contain hashes of arg:value pairs
 
-    module ClassKeys
 
-      def attribute_cache_key(attribute, value)
-        "#{name.tableize}/attribute/#{attribute}/#{URI.escape(value.to_s)}"
+    class KeyMaker
+      attr_accessor :object, :klass
+
+      # INITIATILIZED with OBJECT or CLASS
+      def initialize(options = {})
+        @object ||= options[:object]
+        @klass = options[:class] || object.class
       end
 
-      def all_attribute_cache_key(attribute, value)
-        "#{name.tableize}/attribute/#{attribute}/all/#{URI.escape(value.to_s)}"
+      # HASH generated from SCHEMA to indicate MODEL GENERATIONS
+      def model_generation
+        columns = klass.columns
+        schema_string = columns.sort_by(&:name).map{|c| "#{c.name}:#{c.type}"}.join(',')
+        CityHash.hash64(schema_string)
       end
 
-      def class_method_cache_key(meth, *args)
-        key = "#{name.tableize}/class_method/#{meth}"
-        args.flatten!
-        key += "/#{args.join('+')}" if args.any?
-        return key
+      # HASH generated from ATTRIBUTES to indicate INSTANCE GENERATIONS
+      def instance_generation
+        atts = object.all_attributes
+        att_string = atts.sort.map { |k, v| [k,v].join(":") }.join(",")
+        CityHash.hash64(att_string)
       end
 
-    end
+      # => "users/model_generation"
+      def key_prefix
+        [klass.name.tabelize, model_generation].join("/")
 
-    module InstanceKeys
-
-      def model_cache_key
-        "#{self.class.name.tableize}/#{self.id.to_i}"
+      # EXPIRE ON WRITE OR OVERWRITE ON UPDATE
+      # => "users/model_generation/user.id/"
+      def instance_key(id=nil)
+        id ||= object.id unless object.nil?
+        [key_prefix, id.to_s].join("/")
       end
 
-      def method_cache_key(meth)
-        "#{model_cache_key}/method/#{meth}"
+      # => "users/model_generation/user.id/instance_generation/attribute"
+      def attribute_key(att)
+        [instance_key, instance_generation, att].join("/")
       end
 
-      def belong_association_cache_key(name, polymorphic=nil)
-        name = name.to_s if name.is_a?(Symbol)
-        if polymorphic && self.send("#{name}_type").present?
-          "#{self.send("#{name}_type").tableize}/#{self.send("#{name}_id")}"
-        else
-          "#{name.tableize}/#{self.send(name + "_id")}"
-        end
+      # => "users/model_generation/user.id/instance_generation/method
+      def method_key(method)
+        [instance_key(object.id), instance_generation, method].join("/")
       end
 
-      def have_association_cache_key(name)
-        "#{model_cache_key}/association/#{name}"
+      # EXPIRE MODEL UPDATE, NEW MODEL, MODEL DELETE, ETC. 
+      # ANY CHANGE TO CLASS
+      # => "users/model_generation/method
+      def class_method_key(method)
+        [key_prefix, method, args].join("/")
       end
 
-    end
+      # USED FOR MASS EXPIRY
+      def all_class_method_keys
+        self.cached_class_methods.map { |c_method| class_method_key(c_method) }
+      end
 
+      # => "users/model_generation/user.id/instance_generation/association_name"
+      def association_key(association_name)
+        [instance_key, association_name].join("/")
+      end
+    end 
   end
 end
