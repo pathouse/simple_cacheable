@@ -1,3 +1,5 @@
+#### NEED TO FIGURE OUT HOW WE'RE KEEPING KEYS AND RESULTS TOGETHER IN MULTI FETCHES
+#### ZIP?
 module Cacheable
 	module CacheFetcher
 
@@ -10,35 +12,83 @@ module Cacheable
 				@klass = options[:klass] || object.class
 			end
 
-			def act_on(*keys, &block)
+			def act_on(*key_blobs, options={} &block)
 				if keys.size == 1
-					single_fetch(keys.first) { yield if block_given? }
+					single_fetch(key_blobs.first, options) { yield if block_given? }
 				else
-					multiple_fetch(keys) { yield if block_given? }
+					multiple_fetch(key_blobs) { yield if block_given? }
 				end
 			end
 
-			
-			protected
+			def single_fetch(key_blob, &block, options)
+				result = read_from_cache(key_blob)
+				method_args = Formatter.symbolize_args(options[:args]) unless options.empty?
+				write? = false
 
-			def single_fetch(key, &block)
-				result = read_from_cache(key)
-				if result.nil?
-					if block_given?
-						yield
-						write_to_cache(key, result)
-					end
+				if result.nil? && block_given?
+					result = yield
+					write? = true
+				elsif method_args && result[method_args].nil? && block_given?
+					result[method_args] = yield
+					write? = true
 				end
+
+				write_to_cache(key_blob, result) if write?
 			end
 
-			def multiple_fetch(keys, &block)
-				results = read_multi_from_cache(keys)
+			def multiple_fetch(key_blobs, &block)
+				results = read_multi_from_cache(key_blobs)
+				key_result_join = key_blobs.zip(results).to_hash
 				if results.any(&:nil?)
 					if block_given?
-						yield
-						write_multi_to_cache(keys, results)
+						results = yield
+						write_multi_to_cache(key_result_join)
 					end
 				end
+			end
+
+			private
+
+			##
+			## READING FROM THE CACHE
+			##
+
+			def read_from_cache(key_blob)
+				result = Rails.cache.read key_blob[:key]
+				return result if result.nil?
+				inter = Interpreter.new(result, key_blob[:type])
+				inter.interpret
+			end
+
+			def read_multi_from_cache(key_blobs)
+				keys = key_blobs.map { |blob| blob[:key] }
+				results = Rails.cache.read_multi(keys)
+				return results if results.all?(&:nil?)
+				
+				types = key_blobs.map { |blob| blob[:type] }
+				results.each do |result|
+					unless result.nil?
+						type = types.pop
+						inter = Interpreter.new(result, type)
+						inter.interpret
+					end
+				end
+			end
+
+			###
+			### WRITING TO THE CACHE
+			###
+
+			def write_multi_to_cache(keys_and_results)
+				keys_and_results.each do |key, result|
+					write_to_cache(key, result)
+				end
+			end
+
+			def write_to_cache(key_blob, result)
+				formatter = Formatter.new(result, key_blob[:type])
+				formatted_result = formatter.format
+				Rails.cache.write key_blob[:key], formatted_result
 			end
 		end
 	end

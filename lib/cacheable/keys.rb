@@ -4,11 +4,12 @@ module Cacheable
     # THE KEY MAKER
     #
     # Handles creation of keys for all objects and classes.
-    # Keys generated in hashes { type: :key_type, key: 'key' }
-    # The type is used by the fetcher to minimize computation
+    # Keys generated in hashes called Key blobs => { type: :key_type, key: 'key' }
+    # The type is used by the fetcher so it doesn't have to parse
+    # the key to figure out what kind it is and how to handle its contents.
     # 
     # CLASS KEYS
-    # A class is responsible for expiring instance caches and class method caches
+    # A class is responsible for expiring instance object caches and class method caches
     # class expiry only happens naturally when a model's schema is changed
     # 
     # INSTANCE KEYS
@@ -17,7 +18,10 @@ module Cacheable
     #
     # METHOD KEYS
     # Method keys no longer include arguments. Instead, the cache itself 
-    # will contain hashes of arg:value pairs
+    # will contain hashes of arg:value pairs.
+    # This is to keep class and instance method handling similar. 
+    # Instance methods are trivial to expire, class methods are not, if you
+    # include arguments in their keys. 
 
 
     class KeyMaker
@@ -82,7 +86,7 @@ module Cacheable
 
       # => "users/model_generation/user.id/instance_generation/association_name"
       def association_key(association_name)
-        { type: association,
+        { type: :association,
           key: [instance_key, association_name].join("/") }
       end
     end 
