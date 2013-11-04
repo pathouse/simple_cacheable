@@ -6,16 +6,13 @@ module Cacheable
         |attribute, indices| indices[attribute] = {}
       })
 
-      class_eval do
-        after_commit :expire_attribute_cache, :on => :update
-        after_commit :expire_all_attribute_cache, :on => :update
-      end
-
       attributes.each do |attribute|
         define_singleton_method("find_cached_by_#{attribute}") do |value|
           self.cached_indices["#{attribute}"] ||= []
           self.cached_indices["#{attribute}"] << value
-          Rails.cache.fetch attribute_cache_key("#{attribute}", value) do
+          cache_key = KeyMaker.new(klass: self).attribute_key(attribute, value)
+          fetcher = Fetcher.new(klass: self)
+          fetcher.act_on(cache_key) do
             self.send("find_by_#{attribute}", value)
           end
         end
@@ -23,7 +20,9 @@ module Cacheable
         define_singleton_method("find_cached_all_by_#{attribute}") do |value|
           self.cached_indices["#{attribute}"] ||= []
           self.cached_indices["#{attribute}"] << value
-          Rails.cache.fetch all_attribute_cache_key("#{attribute}", value) do
+          cache_key = KeyMaker.new(klass: self).all_with_attribute_key(attribute, value)
+          fetcher = Fetcher.new(klass: self)
+          fetcher.act_on(cache_key) do
             self.send("find_all_by_#{attribute}", value)
           end
         end

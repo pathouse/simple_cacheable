@@ -1,5 +1,3 @@
-#### NEED TO FIGURE OUT HOW WE'RE KEEPING KEYS AND RESULTS TOGETHER IN MULTI FETCHES
-#### ZIP?
 module Cacheable
 	module CacheFetcher
 
@@ -12,28 +10,33 @@ module Cacheable
 				@klass = options[:klass] || object.class
 			end
 
-			def act_on(*key_blobs, options={} &block)
-				if keys.size == 1
-					single_fetch(key_blobs.first, options) { yield if block_given? }
+			def act_on(key_blob, options={}, &block)
+				unless key_blob.is_a?(Array)
+					single_fetch(key_blob, options) { yield if block_given? }
 				else
-					multiple_fetch(key_blobs) { yield if block_given? }
+					multiple_fetch(key_blob) { yield if block_given? }
 				end
 			end
 
-			def single_fetch(key_blob, &block, options)
+			def single_fetch(key_blob, options, &block)
 				result = read_from_cache(key_blob)
-				method_args = Formatter.symbolize_args(options[:args]) unless options.empty?
-				write? = false
+				method_args = Cacheable::Formatter.symbolize_args(options[:args])
+				should_write = false
 
 				if result.nil? && block_given?
 					result = yield
-					write? = true
-				elsif method_args && result[method_args].nil? && block_given?
-					result[method_args] = yield
-					write? = true
+					should_write = true
+				elsif method_args != :""
+					result ||= {}
+					if (result.has_key?(method_args) == false) && block_given?
+						result[method_args] = yield
+						should_write = true
+					end
 				end
 
-				write_to_cache(key_blob, result) if write?
+				write_to_cache(key_blob, result) if should_write
+				
+				result = (method_args == :"") ? result : result[method_args]
 			end
 
 			def multiple_fetch(key_blobs, &block)
@@ -41,13 +44,11 @@ module Cacheable
 				key_result_join = key_blobs.zip(results).to_hash
 				if results.any(&:nil?)
 					if block_given?
-						results = yield
+						key_result_join = yield(key_result_join)
 						write_multi_to_cache(key_result_join)
 					end
 				end
 			end
-
-			private
 
 			##
 			## READING FROM THE CACHE
@@ -56,20 +57,20 @@ module Cacheable
 			def read_from_cache(key_blob)
 				result = Rails.cache.read key_blob[:key]
 				return result if result.nil?
-				inter = Interpreter.new(result, key_blob[:type])
+				inter = Cacheable::Interpreter.new(result, key_blob[:type])
 				inter.interpret
 			end
 
 			def read_multi_from_cache(key_blobs)
 				keys = key_blobs.map { |blob| blob[:key] }
-				results = Rails.cache.read_multi(keys)
+				results = Rails.cache.read_multi(*keys)
 				return results if results.all?(&:nil?)
 				
 				types = key_blobs.map { |blob| blob[:type] }
-				results.each do |result|
+				results.map do |result|
 					unless result.nil?
 						type = types.pop
-						inter = Interpreter.new(result, type)
+						inter = Cacheable::Interpreter.new(result, type)
 						inter.interpret
 					end
 				end
@@ -86,65 +87,9 @@ module Cacheable
 			end
 
 			def write_to_cache(key_blob, result)
-				formatter = Formatter.new(result, key_blob[:type])
+				formatter = Cacheable::Formatter.new(result, key_blob[:type])
 				formatted_result = formatter.format
 				Rails.cache.write key_blob[:key], formatted_result
-			end
-		end
-	end
-end
-
-# OLD STUFF
-
-module Cacheable
-	module ModelFetch
-
-		def fetch(key, &block)
-			
-			result = read_from_cache(key)
-
-			if result.nil?
-				if block_given?
-					result = yield
-					write_to_cache(key, result)
-				end
-			end
-			result
-		end
-
-		def coder_from_record(record)
-			unless record.nil?
-				coder = { :class => record.class }
-				record.encode_with(coder)
-				coder
-			end
-		end
-
-		def record_from_coder(coder)
-			record = coder[:class].allocate
-			record.init_with(coder)
-		end
-
-		def write_to_cache(key, value)
-			if value.respond_to?(:to_a)
-				value = value.to_a
-				coder = value.map {|obj| coder_from_record(obj) }
-			else
-				coder = coder_from_record(value)
-			end
-
-			Rails.cache.write(key, coder)
-			coder
-		end
-
-		def read_from_cache(key)
-			coder = Rails.cache.read(key)
-			return nil if coder.nil?
-			
-			unless coder.is_a?(Array)
-				record_from_coder(coder)
-			else
-				coder.map { |obj| record_from_coder(obj) }
 			end
 		end
 	end

@@ -1,35 +1,37 @@
 module Cacheable
-	module Formatter
+	module DataFormatter
 
 		class Formatter
 
 			attr_accessor :result, :key_type
 
 			def self.symbolize_args(args)
-				args.each do |arg|
+				return if args.nil?
+				args.map do |arg|
 					if arg.is_a?(Hash)
-						arg.map {|k,v| "#{k}:#{v}"}
+						arg.map {|k,v| "#{k}:#{v}"}.join(",")
 					elsif arg.is_a?(Array)
-						arg.map {|k,v| "#{k},#{v}"}
+						arg.join(",")
 					else
-						arg.to_s
+						arg.to_s.split(" ").join("_")
 					end
 				end.join("+").to_sym
 			end
-			
 
+			def self.escape_punctuation(string)
+    		string.sub(/\?\Z/, '_query').sub(/!\Z/, '_bang')
+ 			end
+			
 			def initialize(result, key_type)
 				@result = result
 				@key_type = key_type
 			end
 
-			def format(options={})
-				if key_blob[:type] == :object || key_blob[:type] == :association
+			def format
+				if key_type == :object || key_type == :association || key_type == :attribute
 					formatted_result = format_object(result)
-				elsif key_blob[:type] == :method || key_blob[:type] == :class_method
-					formatted_result = format_method(result, options)
 				else
-					formatted_result = format_data(result)
+					formatted_result = format_method(result)
 				end
 			end
 
@@ -55,8 +57,8 @@ module Cacheable
 
 			## METHOD FORMATTING ##
 
-			def format_method(result, options)
-				if options[:args].nil?
+			def format_method(result)
+				unless result.is_a?(Hash)
 					format_data(result)
 				else
 					result.each do |arg_key, value|
@@ -66,13 +68,13 @@ module Cacheable
 			end
 
 			def format_data(result)
-				unless result.is_a?(Hash) || result.is_a?(Array)
+				unless result.is_a?(ActiveRecord::Base) || result.is_a?(Array)
 					return result
 				end
 
-				if result.is_a?(Hash) && Interpreter.hash_inspect(result)
+				if result.is_a?(ActiveRecord::Base)
 					result = format_object(result)
-				elsif result[0].is_a?(Hash) && Interpreter.hash_inspect(result[0])
+				elsif result[0].is_a?(ActiveRecord::Base)
 					result.map { |r| format_object(r) }
 				end
 				result

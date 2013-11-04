@@ -3,18 +3,15 @@ module Cacheable
     # Cached class method
     # Should expire on any instance save
     def with_class_method(*methods)
-      self.cached_class_methods = methods.each_with_object({}) { |meth, indices| indices[meth] = [] }
-
-      class_eval do
-        after_commit :expire_class_method_cache, on: :update
-      end
+      self.cached_class_methods ||= []
+      self.cached_class_methods += methods
 
       methods.each do |meth|
         define_singleton_method("cached_#{meth}") do |*args|
-          self.cached_class_methods["#{meth}"] ||= []
-          self.cached_class_methods["#{meth}"] << args
-          Rails.cache.fetch class_method_cache_key(meth, args) do
-            self.method(meth).arity == 0 ? send(meth) : send(meth, *args)
+          cache_key = KeyMaker.new(klass: self).class_method_key(meth)
+          fetcher = Fetcher.new(klass: self)
+          fetcher.act_on(cache_key, args: args) do
+            self.send(meth, args)
           end
         end
       end

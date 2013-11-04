@@ -3,12 +3,10 @@ module Cacheable
     def with_key
       self.cached_key = true
 
-      class_eval do
-        after_commit :expire_key_cache, on: :update
-      end
-
       define_singleton_method("find_cached") do |id|
-        Rails.cache.fetch "#{name.tableize}/" + id.to_i.to_s do
+        cache_key = Cacheable::KeyMaker.new(klass: self).instance_key(id)
+        fetcher = Cacheable::Fetcher.new(klass: self)
+        fetcher.act_on(cache_key) do
           self.find(id)
         end
       end

@@ -30,45 +30,54 @@ module Cacheable
       # INITIATILIZED with OBJECT or CLASS
       def initialize(options = {})
         @object ||= options[:object]
-        @klass = options[:class] || object.class
+        @klass = options[:klass] || object.class
       end
 
       # HASH generated from SCHEMA to indicate MODEL GENERATIONS
       def model_generation
-        columns = klass.columns
+        columns = klass.try(:columns)
+        return if columns.nil?
         schema_string = columns.sort_by(&:name).map{|c| "#{c.name}:#{c.type}"}.join(',')
         CityHash.hash64(schema_string)
       end
 
       # HASH generated from ATTRIBUTES to indicate INSTANCE GENERATIONS
       def instance_generation
-        atts = object.all_attributes
+        atts = object.attributes
         att_string = atts.sort.map { |k, v| [k,v].join(":") }.join(",")
         CityHash.hash64(att_string)
       end
 
       # => "users/model_generation"
       def key_prefix
-        [klass.name.tabelize, model_generation].join("/")
+        [klass.name.tableize, model_generation].join("/")
       end
 
       # EXPIRE ON WRITE OR OVERWRITE ON UPDATE
       # => "users/model_generation/user.id/"
       def instance_key(id=nil)
-        id ||= object.id unless object.nil?
+        id ||= object.try(:id)
         { type: :object, key: [key_prefix, id.to_s].join("/") }
       end
 
-      # => "users/model_generation/user.id/instance_generation/attribute"
-      def attribute_key(att)
+      # => "users/model_generation/attribute:args"
+      def attribute_key(att, *val)
+        att_val = [att, Cacheable::Formatter.symbolize_args(val)].join(":")
         { type: :attribute, 
-          key: [instance_key, instance_generation, att].join("/") }
+          key: [key_prefix, att_val].join("/") }
+      end
+
+      # => "users/model_generation/all/attribute:args"
+      def all_with_attribute_key(att, *val)
+        att_val = [att, Cacheable::Formatter.symbolize_args(val)].join(":")
+        { type: :attribute,
+          key: [key_prefix, "all", att_val].join("/") }
       end
 
       # => "users/model_generation/user.id/instance_generation/method
       def method_key(method)
         { type: :method, 
-          key: [instance_key(object.id), instance_generation, method].join("/") }
+          key: [key_prefix, object.id, instance_generation, method].join("/") }
       end
 
       # EXPIRE MODEL UPDATE, NEW MODEL, MODEL DELETE, ETC. 
@@ -76,18 +85,18 @@ module Cacheable
       # => "users/model_generation/method
       def class_method_key(method)
         { type: :class_method,
-          key: [key_prefix, method, args].join("/") }
+          key: [key_prefix, method].join("/") }
       end
 
       # USED FOR MASS EXPIRY
       def all_class_method_keys
-        self.cached_class_methods.map { |c_method| class_method_key(c_method) }
+        klass.cached_class_methods.map { |c_method| class_method_key(c_method) }
       end
 
       # => "users/model_generation/user.id/instance_generation/association_name"
       def association_key(association_name)
         { type: :association,
-          key: [instance_key, association_name].join("/") }
+          key: [key_prefix, object.id, instance_generation, association_name].join("/") }
       end
     end 
   end

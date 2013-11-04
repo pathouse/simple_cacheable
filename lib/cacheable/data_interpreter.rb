@@ -1,5 +1,5 @@
 module Cacheable
-	module Interpreter
+	module DataInterpreter
 
 		class Interpreter
 
@@ -15,12 +15,11 @@ module Cacheable
 			end
 
 			def interpret
-				if key_type == :object || key_type == :association
+				if key_type == :object || key_type == :attribute || key_type == :association
 					object_parse(result)
-				elsif key_type == :method || key_type == :class_method
-					method_parse(result)
 				else
-					data_parse(result)
+					method_parse(result)
+				end
 			end
 
 			## OBJECT PARSING ##
@@ -46,9 +45,12 @@ module Cacheable
 			# { args.to_string.to_symbol => answer } 
 
 			def method_parse(result)
-				result.map do |k,v|
-					result[k] = data_parse(v)
+				if result.is_a?(Hash)
+					result.each do |k,v|
+						result[k] = data_parse(v)
+					end
 				end
+				result
 			end
 
 			## DATA PARSING ##
@@ -58,9 +60,9 @@ module Cacheable
 					result
 				end
 				
-				if result.is_a?(Hash) && self.hash_inspect(result)
+				if result.is_a?(Hash) && Interpreter.hash_inspect(result)
 					object_parse(result)
-				elsif result[0].is_a?(Hash) && self.hash_inspect(result[0]) 
+				elsif result[0].is_a?(Hash) && Interpreter.hash_inspect(result[0]) 
 					result.map { |r| object_parse(r) }
 				else
 					result
