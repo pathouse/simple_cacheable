@@ -6,7 +6,7 @@ module Cacheable
 			attr_accessor :result, :key_type
 
 			def self.symbolize_args(args)
-				return if args.nil?
+				return :no_args if args.nil? || args.empty?
 				args.map do |arg|
 					if arg.is_a?(Hash)
 						arg.map {|k,v| "#{k}:#{v}"}.join(",")

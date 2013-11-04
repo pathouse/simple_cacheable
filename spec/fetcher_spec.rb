@@ -32,12 +32,24 @@ describe Cacheable::CacheFetcher::Fetcher do
 			User.find_cached(user.id)
 			User.find_cached(user2.id)
 
-			keys = [key_maker.instance_key(user.id), key_maker.instance_key(user2.id)]
-			keys = keys.map {|k| k[:key]}
-			Rails.cache.read_multi(*keys).should == ""
+			key_blobs = [key_maker.instance_key(user.id), key_maker.instance_key(user2.id)]
+			fetcher.read_multi_from_cache(key_blobs).should == [user, user2]
 		end
 
-		it "should accept a block to define behavior on cache miss" do
+		it "should successfully write one key" do
+			key = key_maker.instance_key(user.id)
+			fetcher.write_to_cache(key, user)
+			Rails.cache.read(key[:key]).should == {:class => User, 'attributes' => user.attributes}
+		end
+
+		it "should successfully write multiple keys" do
+			keys = []
+			keys << key_maker.instance_key(user.id)
+			keys << key_maker.instance_key(user2.id)
+			write_blob = keys.zip([user,user2])
+			fetcher.write_multi_to_cache(write_blob)
+			Rails.cache.read_multi(*keys.map {|k| k[:key]}).should == {keys[0][:key] => {:class => User, 'attributes' => user.attributes},
+																																 keys[1][:key] => {:class => User, 'attributes' => user2.attributes}}
 		end
 	end
 end

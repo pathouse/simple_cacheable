@@ -26,7 +26,7 @@ module Cacheable
 				if result.nil? && block_given?
 					result = yield
 					should_write = true
-				elsif method_args != :""
+				elsif method_args != :no_args
 					result ||= {}
 					if (result.has_key?(method_args) == false) && block_given?
 						result[method_args] = yield
@@ -36,7 +36,7 @@ module Cacheable
 
 				write_to_cache(key_blob, result) if should_write
 				
-				result = (method_args == :"") ? result : result[method_args]
+				result = (method_args == :no_args) ? result : result[method_args]
 			end
 
 			def multiple_fetch(key_blobs, &block)
@@ -48,6 +48,7 @@ module Cacheable
 						write_multi_to_cache(key_result_join)
 					end
 				end
+				results
 			end
 
 			##
@@ -65,14 +66,10 @@ module Cacheable
 				keys = key_blobs.map { |blob| blob[:key] }
 				results = Rails.cache.read_multi(*keys)
 				return results if results.all?(&:nil?)
-				
-				types = key_blobs.map { |blob| blob[:type] }
-				results.map do |result|
-					unless result.nil?
-						type = types.pop
-						inter = Cacheable::Interpreter.new(result, type)
-						inter.interpret
-					end
+
+				results.map do |key, result|
+					type = key_blobs.select {|kb| kb.has_value?(key) }.first[:type]
+					Cacheable::Interpreter.new(result, type).interpret
 				end
 			end
 
