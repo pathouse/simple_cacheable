@@ -5,6 +5,8 @@ describe Cacheable do
   let(:user)  { User.create(:login => 'flyerhzm') }
   let(:descendant) { Descendant.create(:login => "scotterc")}
 
+  let(:user_key_maker) { Cacheable::KeyMaker.new(object: user) }
+
   before :all do
     @post1 = user.posts.create(:title => 'post1')
     @post2 = user.posts.create(:title => 'post2')
@@ -17,12 +19,15 @@ describe Cacheable do
   end
 
   it "should not cache User.last_post" do
-    Rails.cache.read("users/#{user.id}/method/last_post").should be_nil
+    key = user_key_maker.method_key(:last_post)
+    Rails.cache.read(key[:key]).should be_nil
   end
 
   it "should cache User#last_post" do
     user.cached_last_post.should == user.last_post
-    Rails.cache.read("users/#{user.id}/method/last_post").should == user.last_post
+    coder = Cacheable::Formatter.new(user.last_post, :object).format
+    key = user_key_maker.method_key(:last_post)
+    Rails.cache.read(key[:key]).should == coder
   end
 
   it "should cache User#last_post multiple times" do
@@ -31,13 +36,18 @@ describe Cacheable do
   end
 
   context "descendant should inherit methods" do
+    let(:desc_key_maker) { Cacheable::KeyMaker.new(object: descendant) }
+
     it "should not cache Descendant.last_post" do
-      Rails.cache.read("descendants/#{descendant.id}/method/last_post").should be_nil
+      key = desc_key_maker.method_key(:last_post)
+      Rails.cache.read(key[:key]).should be_nil
     end
 
     it "should cache Descendant#last_post" do
       descendant.cached_last_post.should == descendant.last_post
-      Rails.cache.read("descendants/#{descendant.id}/method/last_post").should == descendant.last_post
+      key = desc_key_maker.method_key(:last_post)
+      coder = Cacheable::Formatter.new(descendant.last_post, :object).format
+      Rails.cache.read(key[:key]).should == coder
     end
 
     it "should cache Descendant#last_post multiple times" do
@@ -47,12 +57,14 @@ describe Cacheable do
 
     context "as well as new methods" do
       it "should not cache Descendant.name" do
-        Rails.cache.read("descendants/#{descendant.id}/method/name").should be_nil
+        key = desc_key_maker.method_key(:name)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache Descendant#name" do
         descendant.cached_name.should == descendant.name
-        Rails.cache.read("descendants/#{descendant.id}/method/name").should == descendant.name
+        key = desc_key_maker.method_key(:name)
+        Rails.cache.read(key[:key]).should == descendant.name
       end
 
       it "should cache Descendant#name multiple times" do
@@ -63,9 +75,10 @@ describe Cacheable do
   end
 
   describe "memoization" do
+
     before :each do
       user.instance_variable_set("@cached_last_post", nil)
-      user.expire_model_cache
+      user.update_attribute(:login, "pathouse")
     end
 
     it "memoizes cache calls" do
@@ -75,7 +88,7 @@ describe Cacheable do
     end
 
     it "hits the cache only once" do
-      Rails.cache.expects(:fetch).returns(user.last_post).once
+      Rails.cache.expects(:read).returns(user.last_post).once
       user.cached_last_post.should == user.last_post
       user.cached_last_post.should == user.last_post
     end
