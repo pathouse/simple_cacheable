@@ -25,17 +25,17 @@ module Cacheable
 			## OBJECT PARSING ##
 
 			def object_parse(result)
-				coder = result.dup
-				if coder.is_a?(Array)
-					coder.map {|obj| record_from_coder(obj)}
+				if result.is_a?(Array)
+					result.map {|obj| record_from_coder(obj)}
 				else
-					record_from_coder(coder)
+					record_from_coder(result)
 				end
 			end
 
 			def record_from_coder(coder)
 				record = coder[:class].allocate
 				record.init_with(coder)
+				record
 			end
 
 			## METHOD PARSING ## 
@@ -46,11 +46,16 @@ module Cacheable
 
 			def method_parse(result)
 				if result.is_a?(Hash)
-					result.each do |k,v|
-						result[k] = data_parse(v)
+					if Interpreter.hash_inspect(result)
+						data_parse(result)
+					else 
+						result.each do |k,v|
+							result[k] = data_parse(v)
+						end
 					end
+				else
+					data_parse(result)
 				end
-				result
 			end
 
 			## DATA PARSING ##

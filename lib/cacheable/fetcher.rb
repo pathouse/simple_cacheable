@@ -23,13 +23,13 @@ module Cacheable
 				method_args = Cacheable::Formatter.symbolize_args(options[:args])
 				should_write = false
 
-				if result.nil? && block_given?
-					result = yield
-					should_write = true
-				elsif method_args != :no_args
-					result ||= {}
-					if (result.has_key?(method_args) == false) && block_given?
+				if block_given?
+					if method_args != :no_args && (result.nil? || result[method_args].nil?)
+						result ||= {}
 						result[method_args] = yield
+						should_write = true
+					elsif method_args == :no_args && result.nil?
+						result = yield
 						should_write = true
 					end
 				end

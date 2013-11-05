@@ -14,7 +14,7 @@ module Cacheable
           if instance_variable_get(memoized_name).nil?
             result = fetcher.act_on(cache_key, args: args) do
               unless args.empty? 
-                self.send(meth, args)
+                self.send(meth, *args)
               else
                 self.send(meth)
               end
