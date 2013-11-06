@@ -5,8 +5,6 @@ describe Cacheable do
   let(:user)  { User.create(:login => 'flyerhzm') }
   let(:descendant) { Descendant.create(:login => "scotterc")}
 
-  let(:user_key_maker) { Cacheable::KeyMaker.new(object: user) }
-
   before :all do
     @post1 = user.posts.create(:title => 'post1')
     @post2 = user.posts.create(:title => 'post2')
@@ -19,14 +17,14 @@ describe Cacheable do
   end
 
   it "should not cache User.last_post" do
-    key = user_key_maker.method_key(:last_post)
+    key = Cacheable.method_key(user, :last_post)
     Rails.cache.read(key[:key]).should be_nil
   end
 
   it "should cache User#last_post" do
     user.cached_last_post.should == user.last_post
     coder = Cacheable::Formatter.new(user.last_post, :object).format
-    key = user_key_maker.method_key(:last_post)
+    key = Cacheable.method_key(user, :last_post)
     Rails.cache.read(key[:key]).should == coder
   end
 
@@ -39,13 +37,13 @@ describe Cacheable do
     let(:desc_key_maker) { Cacheable::KeyMaker.new(object: descendant) }
 
     it "should not cache Descendant.last_post" do
-      key = desc_key_maker.method_key(:last_post)
+      key = Cacheable.method_key(user, :last_post)
       Rails.cache.read(key[:key]).should be_nil
     end
 
     it "should cache Descendant#last_post" do
       descendant.cached_last_post.should == descendant.last_post
-      key = desc_key_maker.method_key(:last_post)
+      key = Cacheable.method_key(descendant, :last_post)
       coder = Cacheable::Formatter.new(descendant.last_post, :object).format
       Rails.cache.read(key[:key]).should == coder
     end
@@ -57,13 +55,13 @@ describe Cacheable do
 
     context "as well as new methods" do
       it "should not cache Descendant.name" do
-        key = desc_key_maker.method_key(:name)
+        key = Cacheable.method_key(descendant, :name)
         Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache Descendant#name" do
         descendant.cached_name.should == descendant.name
-        key = desc_key_maker.method_key(:name)
+        key = Cacheable.method_key(descendant, :name)
         Rails.cache.read(key[:key]).should == descendant.name
       end
 

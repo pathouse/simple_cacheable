@@ -8,7 +8,7 @@ module Cacheable
 
       methods.each do |meth|
         define_singleton_method("cached_#{meth}") do |*args|
-          cache_key = Cacheable::KeyMaker.new(klass: self).class_method_key("#{meth}")
+          cache_key = Cacheable.class_method_key(self, meth)
           fetcher = Cacheable::Fetcher.new(klass: self)
           fetcher.act_on(cache_key, args: args) do
             unless args.empty?

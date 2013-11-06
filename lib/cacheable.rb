@@ -8,7 +8,6 @@ require "cacheable/data_interpreter"
 require 'cityhash'
 
 module Cacheable
-  include Keys
   include CacheFetcher
   include DataFormatter
   include DataInterpreter

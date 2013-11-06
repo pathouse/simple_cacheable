@@ -1,103 +1,89 @@
 module Cacheable
-  module Keys
 
-    # THE KEY MAKER
-    #
-    # Handles creation of keys for all objects and classes.
-    # Keys generated in hashes called Key blobs => { type: :key_type, key: 'key' }
-    # The type is used by the fetcher so it doesn't have to parse
-    # the key to figure out what kind it is and how to handle its contents.
-    # 
-    # CLASS KEYS
-    # A class is responsible for expiring instance object caches and class method caches
-    # class expiry only happens naturally when a model's schema is changed
-    # 
-    # INSTANCE KEYS
-    # Instance object caches (aside from the main key cache) no longer require expiry
-    # since this now happens automatically w/ attribute-dependent generations
-    #
-    # METHOD KEYS
-    # Method keys no longer include arguments. Instead, the cache itself 
-    # will contain hashes of arg:value pairs.
-    # This is to keep class and instance method handling similar. 
-    # Instance methods are trivial to expire, class methods are not, if you
-    # include arguments in their keys. 
+  # THE KEY MAKER
+  #
+  # Handles creation of keys for all objects and classes.
+  # Keys generated in hashes called Key blobs => { type: :key_type, key: 'key' }
+  # The type is used by the fetcher so it doesn't have to parse
+  # the key to figure out what kind it is and how to handle its contents.
+  # 
+  # CLASS KEYS
+  # A class is responsible for expiring instance object caches and class method caches
+  # class expiry only happens naturally when a model's schema is changed
+  # 
+  # INSTANCE KEYS
+  # Instance object caches (aside from the main key cache) no longer require expiry
+  # since this now happens automatically w/ attribute-dependent generations
+  #
+  # METHOD KEYS
+  # Method keys no longer include arguments. Instead, the cache itself 
+  # will contain hashes of arg:value pairs.
+  # This is to keep class and instance method handling similar. 
+  # Instance methods are trivial to expire, class methods are not, if you
+  # include arguments in their keys. 
 
 
-    class KeyMaker
-      attr_accessor :object, :klass
+  ## CLASS KEYS      
 
-      # INITIATILIZED with OBJECT or CLASS
-      def initialize(options = {})
-        @object ||= options[:object]
-        @klass = options[:klass] || object.class
-      end
-
-      # HASH generated from SCHEMA to indicate MODEL GENERATIONS
-      def model_generation
-        columns = klass.try(:columns)
-        return if columns.nil?
-        schema_string = columns.sort_by(&:name).map{|c| "#{c.name}:#{c.type}"}.join(',')
-        CityHash.hash64(schema_string)
-      end
-
-      # HASH generated from ATTRIBUTES to indicate INSTANCE GENERATIONS
-      def instance_generation
-        atts = object.attributes
-        att_string = atts.sort.map { |k, v| [k,v].join(":") }.join(",")
-        CityHash.hash64(att_string)
-      end
-
-      # => "users/model_generation"
-      def key_prefix
-        [klass.name.tableize, model_generation].join("/")
-      end
-
-      # EXPIRE ON WRITE OR OVERWRITE ON UPDATE
-      # => "users/model_generation/user.id/"
-      def instance_key(id=nil)
-        id ||= object.try(:id)
-        { type: :object, key: [key_prefix, id.to_s].join("/") }
-      end
-
-      # => "users/model_generation/attribute:args"
-      def attribute_key(att, *val)
-        att_val = [att, Cacheable::Formatter.symbolize_args(val)].join(":")
-        { type: :attribute, 
-          key: [key_prefix, att_val].join("/") }
-      end
-
-      # => "users/model_generation/all/attribute:args"
-      def all_with_attribute_key(att, *val)
-        att_val = [att, Cacheable::Formatter.symbolize_args(val)].join(":")
-        { type: :attribute,
-          key: [key_prefix, "all", att_val].join("/") }
-      end
-
-      # => "users/model_generation/user.id/instance_generation/method
-      def method_key(method)
-        { type: :method, 
-          key: [key_prefix, object.id, instance_generation, method].join("/") }
-      end
-
-      # EXPIRE MODEL UPDATE, NEW MODEL, MODEL DELETE, ETC. 
-      # ANY CHANGE TO CLASS
-      # => "users/model_generation/method
-      def class_method_key(method)
-        { type: :class_method,
-          key: [key_prefix, method].join("/") }
-      end
-
-      # USED FOR MASS EXPIRY
-      def all_class_method_keys
-        klass.cached_class_methods.map { |c_method| class_method_key(c_method) }
-      end
-
-      # => "users/model_generation/user.id/instance_generation/association_name"
-      def association_key(association_name)
-        { type: :association,
-          key: [key_prefix, object.id, instance_generation, association_name].join("/") }
-      end
-    end 
+  # HASH generated from SCHEMA to indicate MODEL GENERATIONS
+  # => "users/5821759535148822589"
+  def self.model_prefix(klass)
+    columns = klass.try(:columns)
+    return if columns.nil?
+    schema_string = columns.sort_by(&:name).map{|c| "#{c.name}:#{c.type}"}.join(',')
+    generation = CityHash.hash64(schema_string)
+    [klass.name.tableize, generation].join("/")
   end
+
+  # => "users/5821759535148822589/64"
+  def self.instance_key(klass, id)
+    {type: :object,
+     key: [model_prefix(klass), id].join("/") }
+  end
+
+  # => "users/5821759535148822589/attribute/value"
+  # => "users/5821759535148822589/all/attribute/value"
+  def self.attribute_key(klass, attribute, args, options={})
+    att_args = [attribute, Cacheable::Formatter.symbolize_args(args)].join("/")
+    unless options[:all]
+      { type: :object,
+        key: [model_prefix(klass), att_args].join("/") }
+    else
+      { type: :association,
+        key: [model_prefix(klass), "all", att_args].join("/") }
+    end
+  end
+
+  # => "users/5821759535148822589/method"
+  def self.class_method_key(klass, method)
+    { type: :method, 
+      key: [model_prefix(klass), method].join("/") }
+  end
+
+  def self.all_class_method_keys(klass)
+    klass.cached_class_methods.map { |c_method| class_method_key(c_method) }
+  end
+
+  ## INSTANCE KEYS
+
+  # HASH generated from ATTRIBUTES to indicate INSTANCE GENERATIONS
+  # => "users/5821759535148822589/64/12126514016877773284"
+  def self.instance_prefix(instance)
+    atts = instance.attributes
+    att_string = atts.sort.map { |k, v| [k,v].join(":") }.join(",")
+    generation = CityHash.hash64(att_string)
+    [model_prefix(instance.class), instance.id, generation].join("/")
+  end
+ 
+  # => "users/5821759535148822589/64/12126514016877773284/method"
+  def self.method_key(instance, method)
+    { type: :method,
+      key: [instance_prefix(instance), method].join("/") }
+  end
+
+  # => "users/5821759535148822589/64/12126514016877773284/association"
+  def self.associaton_key(instance, association)
+    { type: :association,
+      key: [instance_prefix(instance), association].join("/") }
+  end 
 end
