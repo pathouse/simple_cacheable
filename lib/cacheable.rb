@@ -3,14 +3,12 @@ require "cacheable/caches"
 require "cacheable/keys"
 require "cacheable/expiry"
 require "cacheable/fetcher"
-require "cacheable/data_formatter"
-require "cacheable/data_interpreter"
+require "cacheable/formatting"
+require "cacheable/parsing"
 require 'cityhash'
 
 module Cacheable
   include CacheFetcher
-  include DataFormatter
-  include DataInterpreter
   include Expiry
 
 

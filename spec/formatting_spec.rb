@@ -1,0 +1,55 @@
+require 'spec_helper'
+
+describe Cacheable do
+  let(:object)  { User.create(:login => 'flyerhzm') }
+  let(:fixnum) { 11 }
+  let(:string) { "string cheese" }
+  let(:hash) { {a: 1, b: 2, c: 3} }
+  let(:array) { ['a','b','c']}
+  let(:bool) { true }
+
+	context "methods" do
+
+		it "should symbolize args correctly" do
+			argsym = Cacheable.symbolize_args([fixnum, string, hash, array])
+			argsym.should == "11+string_cheese+a:1,b:2,c:3+a,b,c".to_sym
+		end
+
+		it "should escape method name punctuation correctly" do
+			Cacheable.escape_punctuation("holy_crap?").should == "holy_crap_query"
+			Cacheable.escape_punctuation("holy_crap!").should == "holy_crap_bang"
+		end
+
+		it "should format objects correctly" do
+			Cacheable.format_with_key(object, :object).should == { :class => object.class, 'attributes' => object.attributes}
+		end
+
+		it "should format multiple object correctly" do
+			coder = { :class => object.class, 'attributes' => object.attributes}
+			Cacheable.format_with_key([object, object], :association).should == [coder, coder]
+		end
+
+		it "should format methods without arguments correctly" do
+			Cacheable.format_with_key(fixnum, :method).should == 11
+		end
+
+		it "should format method with arguments correctly" do
+			arg1 = Cacheable.symbolize_args([fixnum,string,hash])
+			arg2 = Cacheable.symbolize_args([string,hash,fixnum])
+			method_result = { arg1 => "answer1",
+											  arg2 => "answer2" }
+			Cacheable.format_with_key(method_result, :method).should == method_result
+		end
+
+		it "should format object correctly when returned from a method" do
+			arg1 = Cacheable.symbolize_args([fixnum,string])
+			method_result = { arg1 => object }
+			Cacheable.format_with_key(method_result, :method).should == { arg1 => {:class => object.class, 'attributes' => object.attributes} }
+		end
+	end
+end
+
+
+
+
+

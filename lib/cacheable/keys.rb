@@ -61,7 +61,7 @@ module Cacheable
   end
 
   def self.all_class_method_keys(klass)
-    klass.cached_class_methods.map { |c_method| class_method_key(c_method) }
+    klass.cached_class_methods.map { |c_method| class_method_key(klass, c_method) }
   end
 
   ## INSTANCE KEYS
@@ -82,7 +82,7 @@ module Cacheable
   end
 
   # => "users/5821759535148822589/64/12126514016877773284/association"
-  def self.associaton_key(instance, association)
+  def self.association_key(instance, association)
     { type: :association,
       key: [instance_prefix(instance), association].join("/") }
   end 
