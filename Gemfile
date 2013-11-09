@@ -7,6 +7,7 @@ platforms :ruby do
   gem "sqlite3"
   gem "memcached"
   gem "cityhash"
+  gem "debugger"
 end
 
 platforms :jruby do

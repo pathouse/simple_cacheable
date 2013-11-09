@@ -39,6 +39,13 @@ GEM
     atomic (1.1.10)
     builder (3.1.4)
     cityhash (0.8.1)
+    columnize (0.3.6)
+    debugger (1.6.2)
+      columnize (>= 0.3.1)
+      debugger-linecache (~> 1.2.0)
+      debugger-ruby_core_source (~> 1.2.3)
+    debugger-linecache (1.2.0)
+    debugger-ruby_core_source (1.2.3)
     diff-lcs (1.1.3)
     erubis (2.7.0)
     hike (1.2.3)
@@ -108,6 +115,7 @@ DEPENDENCIES
   activerecord-jdbc-adapter
   activerecord-jdbcsqlite3-adapter
   cityhash
+  debugger
   jruby-memcached
   memcached
   mocha (= 0.10.5)

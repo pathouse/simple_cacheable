@@ -31,6 +31,7 @@ describe Cacheable do
   end
 
   it "should cache Post.retrieve_with_user_id" do
+    result = Post.cached_retrieve_with_user_id(1)
     Post.cached_retrieve_with_user_id(1).should == @post1
     key = Cacheable.class_method_key(Post, :retrieve_with_user_id)
     Rails.cache.read(key[:key]).should == {:"1" => {:class => @post1.class, 'attributes' => @post1.attributes }}
@@ -65,7 +66,7 @@ describe Cacheable do
     it "should handle methods with a range argument" do
       result = User.cached_users_with_ids_in( (1...3) )
       key = Cacheable.class_method_key(User, "users_with_ids_in")
-      Rails.cache.read(key[:key]).should == result
+      Rails.cache.read(key[:key]).should == {:"1...3" => [{:class => user.class, 'attributes' => user.attributes }] }
     end
   end
 end

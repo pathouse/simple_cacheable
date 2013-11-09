@@ -36,9 +36,13 @@ describe Cacheable do
 		it "should format method with arguments correctly" do
 			arg1 = Cacheable.symbolize_args([fixnum,string,hash])
 			arg2 = Cacheable.symbolize_args([string,hash,fixnum])
-			method_result = { arg1 => "answer1",
-											  arg2 => "answer2" }
-			Cacheable.format_with_key(method_result, :method).should == method_result
+			to_be_formatted = { arg1 => object, 
+													arg2 => object}
+			formatted = Cacheable.format_with_key(to_be_formatted, :method)
+			formatted[arg1].should == {:class => object.class, 'attributes' => object.attributes }
+			formatted[arg2].should == {:class => object.class, 'attributes' => object.attributes }
+			formatted[arg1].should_not == object
+			formatted[arg2].should_not == object
 		end
 
 		it "should format object correctly when returned from a method" do

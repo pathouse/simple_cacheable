@@ -32,9 +32,11 @@ describe Cacheable do
   	it "should parse only the values of method results" do
   		arg1 = Cacheable.symbolize_args([string,hash])
   		arg2 = Cacheable.symbolize_args([array,bool])
-  		method_result = { arg1 => coder,
+  		method_result = { arg1 => [coder],
   											arg2 => string }
-      Cacheable.parse_with_key(method_result, :method).should == { arg1 => object, arg2 => string }
+      parsed = Cacheable.parse_with_key(method_result, :method)
+      parsed[arg1].should == [object]
+      parsed[arg2].should == string
   	end
 
   	it "should correctly parse methods without arguments" do
