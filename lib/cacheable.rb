@@ -3,8 +3,8 @@ require "cacheable/caches"
 require "cacheable/keys"
 require "cacheable/expiry"
 require "cacheable/fetcher"
-require "cacheable/formatting"
-require "cacheable/parsing"
+require "cacheable/cache_io/formatting"
+require "cacheable/cache_io/parsing"
 require 'cityhash'
 
 module Cacheable
