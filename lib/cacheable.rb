@@ -2,13 +2,12 @@ require 'uri'
 require "cacheable/caches"
 require "cacheable/keys"
 require "cacheable/expiry"
-require "cacheable/fetcher"
+require "cacheable/cache_io/fetching"
 require "cacheable/cache_io/formatting"
 require "cacheable/cache_io/parsing"
 require 'cityhash'
 
 module Cacheable
-  include CacheFetcher
   include Expiry
 
 

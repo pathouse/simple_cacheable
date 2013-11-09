@@ -9,10 +9,9 @@ module Cacheable
         define_method("cached_#{meth}") do |*args|
           args ||= []
           cache_key = Cacheable.method_key(self, meth)
-          fetcher = Cacheable::Fetcher.new(object: self)
-          memoized_name = Cacheable::Formatter.escape_punctuation("@#{method_name}")
+          memoized_name = Cacheable.escape_punctuation("@#{method_name}")
           if instance_variable_get(memoized_name).nil?
-            result = fetcher.act_on(cache_key, args: args) do
+            result = Cacheable.fetch(cache_key, args: args) do
               unless args.empty? 
                 self.send(meth, *args)
               else

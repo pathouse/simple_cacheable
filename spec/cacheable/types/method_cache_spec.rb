@@ -23,7 +23,7 @@ describe Cacheable do
 
   it "should cache User#last_post" do
     user.cached_last_post.should == user.last_post
-    coder = Cacheable::Formatter.new(user.last_post, :object).format
+    coder = Cacheable.format_with_key(user.last_post, :object)
     key = Cacheable.method_key(user, :last_post)
     Rails.cache.read(key[:key]).should == coder
   end
@@ -34,7 +34,6 @@ describe Cacheable do
   end
 
   context "descendant should inherit methods" do
-    let(:desc_key_maker) { Cacheable::KeyMaker.new(object: descendant) }
 
     it "should not cache Descendant.last_post" do
       key = Cacheable.method_key(user, :last_post)
@@ -44,7 +43,7 @@ describe Cacheable do
     it "should cache Descendant#last_post" do
       descendant.cached_last_post.should == descendant.last_post
       key = Cacheable.method_key(descendant, :last_post)
-      coder = Cacheable::Formatter.new(descendant.last_post, :object).format
+      coder = Cacheable.format_with_key(descendant.last_post, :object)
       Rails.cache.read(key[:key]).should == coder
     end
 

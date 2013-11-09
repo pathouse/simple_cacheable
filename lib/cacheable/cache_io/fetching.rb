@@ -45,7 +45,7 @@ module Cacheable
 	## READING FROM THE CACHE
 	##
 
-	def read_from_cache(key_blob)
+	def self.read_from_cache(key_blob)
 		result = Rails.cache.read key_blob[:key]
 		return result if result.nil?
 		parse_with_key(result, key_blob[:type])
@@ -72,7 +72,7 @@ module Cacheable
 	# 	end
 	# end
 
-	def write_to_cache(key_blob, result)
+	def self.write_to_cache(key_blob, result)
 		formatted_result = format_with_key(result, key_blob[:type])
 		Rails.cache.write key_blob[:key], formatted_result
 	end

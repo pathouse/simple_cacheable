@@ -3,7 +3,6 @@ require 'spec_helper'
 describe Cacheable do
   let(:cache) { Rails.cache }
   let(:user)  { User.create(:login => 'flyerhzm') }
-  let(:fetcher) { Cacheable::Fetcher.new(object: user) }
 
   before :each do
     cache.clear
@@ -18,7 +17,13 @@ describe Cacheable do
   it "should cache by User#id" do
     User.find_cached(user.id).should == user
     cache_key = Cacheable.instance_key(User, user.id)
-    Rails.cache.read(cache_key[:key]).should_not be_nil
+    Rails.cache.read(cache_key[:key]).should == {:class => user.class, 'attributes' => user.attributes}
+  end
+
+  it "should parse formatted cache read successfully" do
+    User.find_cached(user.id)
+    cache_key = Cacheable.instance_key(User, user.id)
+    Cacheable.fetch(cache_key).should == user
   end
 
   it "should get cached by User#id multiple times" do
