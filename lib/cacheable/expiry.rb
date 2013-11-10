@@ -1,45 +1,33 @@
 module Cacheable
-  module Expiry
 
-    def expire_all(object)
-      Reaper.new(self).expire
+  def expire_all
+    Cacheable.expire(self)
+  end
+
+  def self.expire(object)
+    expire_instance_key(object)
+    expire_class_method_keys(object)
+    expire_attribute_keys(object)
+  end
+
+  def self.expire_instance_key(object)
+    key = Cacheable.instance_key(object.class, object.id)
+    Rails.cache.delete(key[:key])
+  end
+
+  def self.expire_class_method_keys(object)
+    object.class.cached_class_methods.map do |class_method|
+      key = Cacheable.class_method_key(object.class, class_method)
+    end.each do |method_key|
+      Rails.cache.delete(method_key[:key])
     end
+  end
 
-    class Reaper
-
-      attr_accessor :klass, :object
-
-      def initialize(object)
-        @object = object
-        @klass = object.class
-      end
-
-      def expire
-        expire_instance
-        expire_methods
-        expire_attributes
-      end
-
-      def expire_instance
-        key = KeyMaker.new(object: object).instance_key
-        Rails.cache.delete(key)
-      end
-
-      def expire_methods
-        klass.cached_class_methods.map do |m| 
-          KeyMaker.new(klass: klass).class_method_key(m)
-        end.each do |mkey|
-          Rails.cache.delete(mkey)
-        end
-      end
-
-      def expire_attributes
-        klass.cached_indices.map do |index, values|
-          values.map { |v| KeyMaker.new(klass: klass).attribute_key(index, v) }
-        end.flatten.each do |akey|
-          Rails.cache.delete(akey)
-        end
-      end
+  def self.expire_attribute_keys(object)
+    object.class.cached_indices.map do |index, values|
+      values.map { |v| Cacheable.attribute_key(object.class, index, v) }
+    end.flatten.each do |attribute_key|
+      Rails.cache.delete(attribute_key[:key])
     end
   end
 end

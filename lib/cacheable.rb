@@ -8,8 +8,6 @@ require "cacheable/cache_io/parsing"
 require 'cityhash'
 
 module Cacheable
-  include Expiry
-
 
   def self.included(base)
     base.extend(Cacheable::Caches)
@@ -21,9 +19,7 @@ module Cacheable
                         :cached_methods,
                         :cached_class_methods,
                         :cached_associations
-      after_commit :expire_all, :on => :create
-      after_commit :expire_all, :on => :destroy
-      after_commit :expire_all, :on => :update
+      after_commit :expire_all
     end
   end
 
