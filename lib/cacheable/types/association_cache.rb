@@ -13,20 +13,30 @@ module Cacheable
     def cached_assoc_methods(name)
       method_name = "cached_#{name}"
       define_method(method_name) do
-        cache_key = Cacheable::KeyMaker.new(object: self).association_key(name)
-        fetcher = Cacheable::Fetcher.new(object: self)
+        cache_key = Cacheable.association_key(self, name)
+        
         if instance_variable_get("@#{method_name}").nil?
-          instance_keys = fetcher.act_on(cache_key) do
-            self.send(name).map { |obj| Cacheable::KeyMaker.new(object: obj).instance_key }
+          instance_keys = Cacheable.fetch(cache_key) do
+            Array.wrap(self.send(name)).map { |obj| Cacheable.instance_key(obj.class, obj.id) }
           end
-          association = fetcher.act_on(*instance_keys) do |keys_results|
-            keys_results.each do |key,result|
-              if result.nil?
-                key_parts = key.scan(/(^.*)\/(.*)\/(.*$)/).last
-                keys_results[key] = key_parts.first.constantize.send(:find, key_parts.last.to_i)
-              end
+          
+          association = Cacheable.fetch(instance_keys) do |key_blobs|
+            result = {}
+            instance_keys.each do |ik|
+              key_parts = ik[:key].scan(/(^.*)\/(.*)\/(.*$)/).flatten
+              result[ik] = Object.const_get(key_parts.first.singularize.capitalize).send(:find, key_parts.last.to_i)
             end
+            result
           end
+
+          association = if association.size == 0 
+                          name.to_s.pluralize == name.to_s ? [] : nil
+                        elsif association.size == 1
+                          name.to_s.pluralize == name.to_s ? association : association.first
+                        else
+                          association
+                        end
+
           instance_variable_set("@#{method_name}", association)
         end
         instance_variable_get("@#{method_name}")

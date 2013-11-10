@@ -18,12 +18,14 @@ describe Cacheable do
 
   context "with_attribute" do
     it "should not cache User.find_by_login" do
-      Rails.cache.read("users/attribute/login/flyerhzm").should be_nil
+      key = Cacheable.attribute_key(User, :login, "flyerhzm")
+      Rails.cache.read(key[:key]).should be_nil
     end
 
     it "should cache by User.find_by_login" do
       User.find_cached_by_login("flyerhzm").should == user
-      Rails.cache.read("users/attribute/login/flyerhzm").should == user
+      key = Cacheable.attribute_key(User, :login, 'flyerhzm')
+      Rails.cache.read(key[:key]).should == {:class => user.class, 'attributes' => user.attributes}
     end
 
     it "should get cached by User.find_by_login multiple times" do
@@ -38,17 +40,21 @@ describe Cacheable do
 
     it "should handle fixed numbers" do
       Post.find_cached_by_user_id(user.id).should == @post1
-      Rails.cache.read("posts/attribute/user_id/#{user.id}").should == @post1
+      key = Cacheable.attribute_key(Post, :user_id, user.id)
+      Rails.cache.read(key[:key]).should == {:class => @post1.class, 'attributes' => @post1.attributes}
     end
 
     context "find_all" do
       it "should not cache Post.find_all_by_user_id" do
-        Rails.cache.read("posts/attribute/user_id/all/#{user.id}").should be_nil
+        key = Cacheable.attribute_key(Post, :user_id, user.id, all: true)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache by Post.find_cached_all_by_user_id" do
         Post.find_cached_all_by_user_id(user.id).should == [@post1, @post2]
-        Rails.cache.read("posts/attribute/user_id/all/#{user.id}").should == [@post1, @post2]
+        key = Cacheable.attribute_key(Post, :user_id, user.id, all: true)
+        Rails.cache.read(key[:key]).should == [{:class => Post, 'attributes' => @post1.attributes},
+                                                                              {:class => Post, 'attributes' => @post2.attributes}]
       end
 
       it "should get cached by Post.find_cached_all_by_user_id multiple times" do
@@ -61,12 +67,14 @@ describe Cacheable do
 
   context "descendant" do
     it "should not cache Descendant.find_by_login" do
-      Rails.cache.read("descendants/attribute/login/scotterc").should be_nil
+      key = Cacheable.attribute_key(Descendant, :login, "scotterc")
+      Rails.cache.read(key[:key]).should be_nil
     end
 
     it "should cache by Descendant.find_by_login" do
       Descendant.find_cached_by_login("scotterc").should == descendant
-      Rails.cache.read("descendants/attribute/login/scotterc").should == descendant
+      key = Cacheable.attribute_key(Descendant, :login, "scotterc")
+      Rails.cache.read(key[:key]).should == {:class => Descendant, 'attributes' => descendant.attributes}
     end
 
     it "should get cached by Descendant.find_by_login multiple times" do
@@ -80,9 +88,10 @@ describe Cacheable do
     end
 
     it "maintains cached methods" do
-      Rails.cache.read("descendants/#{descendant.id}/method/name").should be_nil
+      key = Cacheable.method_key(descendant, :name)
+      Rails.cache.read(key[:key]).should be_nil
       descendant.cached_name.should == descendant.name
-      Rails.cache.read("descendants/#{descendant.id}/method/name").should == descendant.name
+      Rails.cache.read(key[:key]).should == descendant.name
     end
   end
 

@@ -19,7 +19,9 @@ module Cacheable
 
 	def self.format_with_key(result, key_type)
 		return if result.nil?
-		if key_type == :object || key_type == :association
+		if key_type == :association
+			result
+		elsif key_type == :object
 			formatted_result = format_object(result)
 		else
 			formatted_result = format_method(result)

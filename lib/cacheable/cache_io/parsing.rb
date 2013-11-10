@@ -2,7 +2,9 @@ module Cacheable
 
 	def self.parse_with_key(result, key_type)
 		return if result.nil?
-		if key_type == :object || key_type == :association
+		if key_type == :association
+			result
+		elsif key_type == :object
 			object_parse(result)
 		else
 			method_parse(result)

@@ -44,12 +44,12 @@ module Cacheable
   # => "users/5821759535148822589/attribute/value"
   # => "users/5821759535148822589/all/attribute/value"
   def self.attribute_key(klass, attribute, args, options={})
-    att_args = [attribute, Cacheable::Formatter.symbolize_args(args)].join("/")
+    att_args = [attribute, Cacheable.symbolize_args([args])].join("/")
     unless options[:all]
       { type: :object,
         key: [model_prefix(klass), att_args].join("/") }
     else
-      { type: :association,
+      { type: :object,
         key: [model_prefix(klass), "all", att_args].join("/") }
     end
   end

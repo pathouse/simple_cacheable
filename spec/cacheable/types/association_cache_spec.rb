@@ -34,12 +34,14 @@ describe Cacheable do
 
     context "belongs_to" do
       it "should not cache association" do
-        Rails.cache.read("users/#{user.id}").should be_nil
+        key = Cacheable.association_key(@post1, :user)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache Post#user" do
         @post1.cached_user.should == user
-        Rails.cache.read("users/#{user.id}").should == user
+        key = Cacheable.association_key(@post1, :user)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(User, user.id)]
       end
 
       it "should cache Post#user multiple times" do
@@ -48,9 +50,10 @@ describe Cacheable do
       end
 
       it "should cache Comment#commentable with polymorphic" do
-        Rails.cache.read("posts/#{@post1.id}").should be_nil
+        key = Cacheable.association_key(@comment1, :commentable)
+        Rails.cache.read(key[:key]).should be_nil
         @comment1.cached_commentable.should == @post1
-        Rails.cache.read("posts/#{@post1.id}").should == @post1
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Post, @post1.id)]
       end
 
       it "should return nil if there are none" do
@@ -60,12 +63,15 @@ describe Cacheable do
 
     context "has_many" do
       it "should not cache associations" do
-        Rails.cache.read("users/#{user.id}/association/posts").should be_nil
+        key = Cacheable.association_key(user, :posts)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache User#posts" do
         user.cached_posts.should == [@post1, @post2]
-        Rails.cache.read("users/#{user.id}/association/posts").should == [@post1, @post2]
+        key = Cacheable.association_key(user, :posts)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Post, @post1.id), 
+                                               Cacheable.instance_key(Post, @post2.id)]
       end
 
       it "should cache User#posts multiple times" do
@@ -80,12 +86,15 @@ describe Cacheable do
 
     context "has_many with polymorphic" do
       it "should not cache associations" do
-        Rails.cache.read("posts/#{@post1.id}/association/comments").should be_nil
+        key = Cacheable.association_key(@post1, :comments)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache Post#comments" do
         @post1.cached_comments.should == [@comment1, @comment2]
-        Rails.cache.read("posts/#{@post1.id}/association/comments").should == [@comment1, @comment2]
+        key = Cacheable.association_key(@post1, :comments)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Comment, @comment1.id), 
+                                               Cacheable.instance_key(Comment, @comment2.id)]
       end
 
       it "should cache Post#comments multiple times" do
@@ -100,12 +109,14 @@ describe Cacheable do
 
     context "has_one" do
       it "should not cache associations" do
-        Rails.cache.read("users/#{user.id}/association/account").should be_nil
+        key = Cacheable.association_key(user, :account)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache User#posts" do
         user.cached_account.should == @account
-        Rails.cache.read("users/#{user.id}/association/account").should == @account
+        key = Cacheable.association_key(user, :account)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Account, @account.id)]
       end
 
       it "should cache User#posts multiple times" do
@@ -120,12 +131,15 @@ describe Cacheable do
 
     context "has_many through" do
       it "should not cache associations" do
-        Rails.cache.read("users/#{user.id}/association/images").should be_nil
+        key = Cacheable.association_key(user, :images)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache User#images" do
         user.cached_images.should == [@image1, @image2]
-        Rails.cache.read("users/#{user.id}/association/images").should == [@image1, @image2]
+        key = Cacheable.association_key(user, :images)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Image, @image1.id), 
+                                               Cacheable.instance_key(Image, @image2.id)]
       end
 
       it "should cache User#images multiple times" do
@@ -140,9 +154,12 @@ describe Cacheable do
 
         it "should have the correct collection" do
           @image3 = @post1.images.create
-          Rails.cache.read("users/#{user.id}/association/images").should be_nil
+          key = Cacheable.association_key(user, :images)
+          Rails.cache.read(key[:key]).should be_nil
           user.cached_images.should == [@image1, @image2, @image3]
-          Rails.cache.read("users/#{user.id}/association/images").should == [@image1, @image2, @image3]
+          Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Image, @image1.id), 
+                                                 Cacheable.instance_key(Image, @image2.id), 
+                                                 Cacheable.instance_key(Image, @image3.id)]
         end
       end
 
@@ -153,12 +170,14 @@ describe Cacheable do
 
     context "has_one through belongs_to" do
       it "should not cache associations" do
-        Rails.cache.read("users/#{user.id}/association/group").should be_nil
+        key = Cacheable.association_key(user, :group)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache User#group" do
         user.cached_group.should == @group1
-        Rails.cache.read("users/#{user.id}/association/group").should == @group1
+        key = Cacheable.association_key(user, :group)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Group, @group1.id)]
       end
 
       it "should cache User#group multiple times" do
@@ -175,12 +194,15 @@ describe Cacheable do
     context "has_and_belongs_to_many" do
 
       it "should not cache associations off the bat" do
-        Rails.cache.read("posts/#{@post1.id}/association/tags").should be_nil
+        key = Cacheable.association_key(@post1, :tags)
+        Rails.cache.read(key[:key]).should be_nil
       end
 
       it "should cache Post#tags" do
         @post1.cached_tags.should == [@tag1, @tag2]
-        Rails.cache.read("posts/#{@post1.id}/association/tags").should == [@tag1, @tag2]
+        key = Cacheable.association_key(@post1, :tags)
+        Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Tag, @tag1.id),
+                                               Cacheable.instance_key(Tag, @tag2.id)]
       end
 
       it "should handle multiple requests" do
@@ -199,71 +221,14 @@ describe Cacheable do
 
         it "should have the correct collection" do
           @tag3 = @post1.tags.create!(title: "Invalidation is hard")
-          Rails.cache.read("posts/#{@post1.id}/association/tags").should be_nil
+          key = Cacheable.association_key(@post1, :tags)
+          Rails.cache.read(key[:key]).should be_nil
           @post1.cached_tags.should == [@tag1, @tag2, @tag3]
-          Rails.cache.read("posts/#{@post1.id}/association/tags").should == [@tag1, @tag2, @tag3]
+          Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Tag, @tag1.id),
+                                                 Cacheable.instance_key(Tag, @tag2.id), 
+                                                 Cacheable.instance_key(Tag, @tag3.id)]
         end
       end
-    end
-
-  end
-
-  describe "after_commit bug" do
-    it "normal" do
-      @image1.expects(:do_something).once
-      @image1.save
-    end
-
-    it "new image fails without association" do
-      image = Image.new
-      image.expects(:do_something).once
-      image.save
-    end
-
-    it "new image fails with missing association" do
-      image = @group1.images.new
-      image.expects(:do_something).once
-      image.save
-    end
-  end
-
-  describe "belongs_to bug" do
-
-    it "shouldn't hit location" do
-      @location.expects(:expire_association_cache).with(:images).never
-      user.save
-    end
-
-    context "with a user" do
-      it "should not hit expire_association_cache on save" do
-        account = Account.create
-        user = User.new
-        user.expects(:expire_association_cache)
-        account.stubs(:user).returns user
-        account.save
-      end
-    end
-
-    context "without a user" do
-      it "should not hit expire_association_cache on save" do
-        account = Account.create
-        obj = mock "object"
-        obj.stubs(:nil?).returns true
-        account.stubs(:user).returns obj
-        obj.expects(:expire_association_cache).never
-        account.expire_account_cache
-      end
-
-    end
-
-  end
-
-  # https://github.com/Shopify/identity_cache/pull/55/files
-  describe "rails association cache" do
-    it "should not load associated records" do
-      user.posts
-      cached_user = User.find_cached(user.id)
-      cached_user.posts.loaded?.should be_false
     end
   end
 
@@ -271,7 +236,7 @@ describe Cacheable do
     describe "belongs to" do
       before :each do
         @post1.instance_variable_set("@cached_user", nil)
-        @post1.expire_model_cache
+        @post1.update_attribute(:title, rand(10000).to_s)
       end
 
       it "memoizes cache calls" do
@@ -281,7 +246,7 @@ describe Cacheable do
       end
 
       it "hits the cache only once" do
-        Rails.cache.expects(:fetch).returns(@post1.user).once
+        Rails.cache.expects(:read).once
         @post1.cached_user.should == @post1.user
         @post1.cached_user.should == @post1.user
       end
@@ -290,7 +255,7 @@ describe Cacheable do
     describe "has through" do
       before :each do
         user.instance_variable_set("@cached_images", nil)
-        user.expire_model_cache
+        user.update_attribute(:login, rand(10000).to_s)
       end
 
       it "memoizes cache calls" do
@@ -300,7 +265,7 @@ describe Cacheable do
       end
 
       it "hits the cache only once" do
-        Rails.cache.expects(:fetch).returns(user.images).once
+        Rails.cache.expects(:read)
         user.cached_images.should == user.images
         user.cached_images.should == user.images
       end
@@ -309,7 +274,7 @@ describe Cacheable do
     describe "has and belongs to many" do
       before :each do
         @post1.instance_variable_set("@cached_tags", nil)
-        @post1.expire_model_cache
+        @post1.update_attribute(:title, rand(10000).to_s)
       end
 
       it "memoizes cache calls" do
@@ -319,7 +284,7 @@ describe Cacheable do
       end
 
       it "hits the cache only once" do
-        Rails.cache.expects(:fetch).returns(@post1.tags).once
+        Rails.cache.expects(:read)
         @post1.cached_tags.should == @post1.tags
         @post1.cached_tags.should == @post1.tags
       end
@@ -328,7 +293,7 @@ describe Cacheable do
     describe "one to many" do
       before :each do
         user.instance_variable_set("@cached_posts", nil)
-        user.expire_model_cache
+        user.update_attribute(:login, rand(10000).to_s)
       end
 
       it "memoizes cache calls" do
@@ -338,7 +303,7 @@ describe Cacheable do
       end
 
       it "hits the cache only once" do
-        Rails.cache.expects(:fetch).returns(user.posts).once
+        Rails.cache.expects(:read)
         user.cached_posts.should == user.posts
         user.cached_posts.should == user.posts
       end

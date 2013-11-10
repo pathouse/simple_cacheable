@@ -10,9 +10,8 @@ module Cacheable
         define_singleton_method("find_cached_by_#{attribute}") do |value|
           self.cached_indices["#{attribute}"] ||= []
           self.cached_indices["#{attribute}"] << value
-          cache_key = KeyMaker.new(klass: self).attribute_key(attribute, value)
-          fetcher = Fetcher.new(klass: self)
-          fetcher.act_on(cache_key) do
+          cache_key = Cacheable.attribute_key(self, attribute, value)
+          Cacheable.fetch(cache_key) do
             self.send("find_by_#{attribute}", value)
           end
         end
@@ -20,9 +19,8 @@ module Cacheable
         define_singleton_method("find_cached_all_by_#{attribute}") do |value|
           self.cached_indices["#{attribute}"] ||= []
           self.cached_indices["#{attribute}"] << value
-          cache_key = KeyMaker.new(klass: self).all_with_attribute_key(attribute, value)
-          fetcher = Fetcher.new(klass: self)
-          fetcher.act_on(cache_key) do
+          cache_key = Cacheable.attribute_key(self, attribute, value, all: true)
+          Cacheable.fetch(cache_key) do
             self.send("find_all_by_#{attribute}", value)
           end
         end
