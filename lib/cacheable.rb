@@ -2,13 +2,16 @@ require 'uri'
 require "cacheable/caches"
 require "cacheable/keys"
 require "cacheable/expiry"
+require "cacheable/cache_io/fetching"
+require "cacheable/cache_io/formatting"
+require "cacheable/cache_io/parsing"
+require 'cityhash'
 
 module Cacheable
+
   def self.included(base)
     base.extend(Cacheable::Caches)
-    base.send :include, Cacheable::Keys
-    base.send :include, Cacheable::Expiry
-    base.send :extend,  ClassMethods
+    base.extend(Cacheable::ClassMethods)
 
     base.class_eval do
       class_attribute   :cached_key,
@@ -16,18 +19,14 @@ module Cacheable
                         :cached_methods,
                         :cached_class_methods,
                         :cached_associations
+      after_commit :expire_all
     end
-  end
-
-  def self.escape_punctuation(string)
-    string.sub(/\?\Z/, '_query').sub(/!\Z/, '_bang')
   end
 
   module ClassMethods
     def model_cache(&block)
       instance_exec &block
     end
-
   end
 
 end

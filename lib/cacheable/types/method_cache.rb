@@ -4,22 +4,23 @@ module Cacheable
       self.cached_methods ||= []
       self.cached_methods += methods
 
-      class_eval do
-        after_commit :expire_method_cache, :on => :update
-      end
-
       methods.each do |meth|
         method_name = "cached_#{meth}"
-        define_method(method_name) do
-          iv = Cacheable.escape_punctuation("@#{method_name}")
-          if instance_variable_get(iv).nil?
-            instance_variable_set(iv,
-              (Rails.cache.fetch method_cache_key(meth) do
-                send(meth)
-              end)
-            )
+        define_method("cached_#{meth}") do |*args|
+          args ||= []
+          cache_key = Cacheable.method_key(self, meth)
+          memoized_name = Cacheable.escape_punctuation("@#{method_name}")
+          if instance_variable_get(memoized_name).nil?
+            result = Cacheable.fetch(cache_key, args: args) do
+              unless args.empty? 
+                self.send(meth, *args)
+              else
+                self.send(meth)
+              end
+            end
+            instance_variable_set(memoized_name, result)
           end
-          instance_variable_get(iv)
+          instance_variable_get(memoized_name)
         end
       end
     end

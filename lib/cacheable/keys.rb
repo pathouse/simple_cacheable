@@ -1,54 +1,89 @@
 module Cacheable
-  module Keys
 
-    def self.included(base)
-      base.extend(Cacheable::Keys::ClassKeys)
-      base.send :include, Cacheable::Keys::InstanceKeys
-    end
+  # THE KEY MAKER
+  #
+  # Handles creation of keys for all objects and classes.
+  # Keys generated in hashes called Key blobs => { type: :key_type, key: 'key' }
+  # The type is used by the fetcher so it doesn't have to parse
+  # the key to figure out what kind it is and how to handle its contents.
+  # 
+  # CLASS KEYS
+  # A class is responsible for expiring instance object caches and class method caches
+  # class expiry only happens naturally when a model's schema is changed
+  # 
+  # INSTANCE KEYS
+  # Instance object caches (aside from the main key cache) no longer require expiry
+  # since this now happens automatically w/ attribute-dependent generations
+  #
+  # METHOD KEYS
+  # Method keys no longer include arguments. Instead, the cache itself 
+  # will contain hashes of arg:value pairs.
+  # This is to keep class and instance method handling similar. 
+  # Instance methods are trivial to expire, class methods are not, if you
+  # include arguments in their keys. 
 
-    module ClassKeys
 
-      def attribute_cache_key(attribute, value)
-        "#{name.tableize}/attribute/#{attribute}/#{URI.escape(value.to_s)}"
-      end
+  ## CLASS KEYS      
 
-      def all_attribute_cache_key(attribute, value)
-        "#{name.tableize}/attribute/#{attribute}/all/#{URI.escape(value.to_s)}"
-      end
-
-      def class_method_cache_key(meth, *args)
-        key = "#{name.tableize}/class_method/#{meth}"
-        args.flatten!
-        key += "/#{args.join('+')}" if args.any?
-        return key
-      end
-
-    end
-
-    module InstanceKeys
-
-      def model_cache_key
-        "#{self.class.name.tableize}/#{self.id.to_i}"
-      end
-
-      def method_cache_key(meth)
-        "#{model_cache_key}/method/#{meth}"
-      end
-
-      def belong_association_cache_key(name, polymorphic=nil)
-        name = name.to_s if name.is_a?(Symbol)
-        if polymorphic && self.send("#{name}_type").present?
-          "#{self.send("#{name}_type").tableize}/#{self.send("#{name}_id")}"
-        else
-          "#{name.tableize}/#{self.send(name + "_id")}"
-        end
-      end
-
-      def have_association_cache_key(name)
-        "#{model_cache_key}/association/#{name}"
-      end
-
-    end
-
+  # HASH generated from SCHEMA to indicate MODEL GENERATIONS
+  # => "users/5821759535148822589"
+  def self.model_prefix(klass)
+    columns = klass.try(:columns)
+    return if columns.nil?
+    schema_string = columns.sort_by(&:name).map{|c| "#{c.name}:#{c.type}"}.join(',')
+    generation = CityHash.hash64(schema_string)
+    [klass.name.tableize, generation].join("/")
   end
+
+  # => "users/5821759535148822589/64"
+  def self.instance_key(klass, id)
+    {type: :object,
+     key: [model_prefix(klass), id].join("/") }
+  end
+
+  # => "users/5821759535148822589/attribute/value"
+  # => "users/5821759535148822589/all/attribute/value"
+  def self.attribute_key(klass, attribute, args, options={})
+    att_args = [attribute, Cacheable.symbolize_args([args])].join("/")
+    unless options[:all]
+      { type: :object,
+        key: [model_prefix(klass), att_args].join("/") }
+    else
+      { type: :object,
+        key: [model_prefix(klass), "all", att_args].join("/") }
+    end
+  end
+
+  # => "users/5821759535148822589/method"
+  def self.class_method_key(klass, method)
+    { type: :method, 
+      key: [model_prefix(klass), method].join("/") }
+  end
+
+  def self.all_class_method_keys(klass)
+    klass.cached_class_methods.map { |c_method| class_method_key(klass, c_method) }
+  end
+
+  ## INSTANCE KEYS
+
+  # HASH generated from ATTRIBUTES to indicate INSTANCE GENERATIONS
+  # => "users/5821759535148822589/64/12126514016877773284"
+  def self.instance_prefix(instance)
+    atts = instance.attributes
+    att_string = atts.sort.map { |k, v| [k,v].join(":") }.join(",")
+    generation = CityHash.hash64(att_string)
+    [model_prefix(instance.class), instance.id, generation].join("/")
+  end
+ 
+  # => "users/5821759535148822589/64/12126514016877773284/method"
+  def self.method_key(instance, method)
+    { type: :method,
+      key: [instance_prefix(instance), method].join("/") }
+  end
+
+  # => "users/5821759535148822589/64/12126514016877773284/association"
+  def self.association_key(instance, association)
+    { type: :association,
+      key: [instance_prefix(instance), association].join("/") }
+  end 
 end

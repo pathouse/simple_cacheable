@@ -10,12 +10,20 @@ describe Cacheable do
   end
 
   it "should not cache key" do
-    Rails.cache.read("users/#{user.id}").should be_nil
+    cache_key = Cacheable.instance_key(User, user.id)
+    Rails.cache.read(cache_key[:key]).should be_nil
   end
 
   it "should cache by User#id" do
     User.find_cached(user.id).should == user
-    Rails.cache.read("users/#{user.id}").should == user
+    cache_key = Cacheable.instance_key(User, user.id)
+    Rails.cache.read(cache_key[:key]).should == {:class => user.class, 'attributes' => user.attributes}
+  end
+
+  it "should parse formatted cache read successfully" do
+    User.find_cached(user.id)
+    cache_key = Cacheable.instance_key(User, user.id)
+    Cacheable.fetch(cache_key).should == user
   end
 
   it "should get cached by User#id multiple times" do
