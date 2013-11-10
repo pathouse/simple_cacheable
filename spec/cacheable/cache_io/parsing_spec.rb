@@ -26,7 +26,7 @@ describe Cacheable do
   	end
 
   	it "should rebuild multiple objects" do
-      Cacheable.parse_with_key([coder, coder], :association).should == [object, object]
+      Cacheable.parse_with_key([coder, coder], :object).should == [object, object]
   	end
 
   	it "should parse only the values of method results" do

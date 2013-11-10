@@ -26,7 +26,7 @@ describe Cacheable do
 
 		it "should format multiple object correctly" do
 			coder = { :class => object.class, 'attributes' => object.attributes}
-			Cacheable.format_with_key([object, object], :association).should == [coder, coder]
+			Cacheable.format_with_key([object, object], :object).should == [coder, coder]
 		end
 
 		it "should format methods without arguments correctly" do

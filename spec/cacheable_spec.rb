@@ -21,44 +21,56 @@ describe Cacheable do
   context "Association Expires on Save" do
     it "should delete has_many with_association cache" do
       user.cached_posts
-      Rails.cache.read("users/#{user.id}/association/posts").should_not be_nil
-      @post1.save
-      Rails.cache.read("users/#{user.id}/association/posts").should be_nil
+      key = Cacheable.association_key(user, :posts)
+      Rails.cache.read(key[:key]).should_not be_nil
+      @post1.update_attribute(:title, "Blarg")
+      old_key = Rails.cache.read(key[:key]).first
+      Rails.cache.read(old_key[:key]).should be_nil
     end
 
     it "should delete has_many with polymorphic with_association cache" do
       @post1.cached_comments
-      Rails.cache.read("posts/#{@post1.id}/association/comments").should_not be_nil
-      @comment1.save
-      Rails.cache.read("posts/#{@post1.id}/association/comments").should be_nil
+      key = Cacheable.association_key(@post1, :comments)
+      Rails.cache.read(key[:key]).should_not be_nil
+      @comment1.update_attribute(:commentable_type, "fart")
+      old_key = Rails.cache.read(key[:key]).first
+      Rails.cache.read(old_key[:key]).should be_nil
     end
 
     it "should delete has_many through with_association cache" do
       user.cached_images
-      Rails.cache.read("users/#{user.id}/association/images").should_not be_nil
-      @image1.save
-      Rails.cache.read("users/#{user.id}/association/images").should be_nil
+      key = Cacheable.association_key(user, :images)
+      Rails.cache.read(key[:key]).should_not be_nil
+      @image1.update_attribute(:viewable_type, "Gralb")
+      old_key = Rails.cache.read(key[:key]).first
+      Rails.cache.read(old_key[:key]).should be_nil
     end
 
     it "should delete has_one with_association cache" do
       user.cached_account
-      Rails.cache.read("users/#{user.id}/association/account").should_not be_nil
-      @account.save
-      Rails.cache.read("users/#{user.id}/association/account").should be_nil
+      key = Cacheable.association_key(user, :account)
+      Rails.cache.read(key[:key]).should_not be_nil
+      @account.update_attribute(:group_id, 7)
+      old_key = Rails.cache.read(key[:key]).first
+      Rails.cache.read(old_key[:key]).should be_nil
     end
 
     it "should delete has_and_belongs_to_many with_association cache" do
       @post1.cached_tags
-      Rails.cache.read("posts/#{@post1.id}/association/tags").should_not be_nil
-      @tag1.save
-      Rails.cache.read("posts/#{@post1.id}/association/tags").should be_nil
+      key = Cacheable.association_key(@post1, :tags)
+      Rails.cache.read(key[:key]).should_not be_nil
+      old_key = Rails.cache.read(key[:key]).first
+      @tag1.update_attribute(:title, "new title")
+      Rails.cache.read(old_key[:key]).should be_nil
     end
 
     it "should delete has_one through belongs_to with_association cache" do
-      @group1.save
-      Rails.cache.read("users/#{user.id}/association/group").should be_nil
+      @account.update_attribute(:group_id, 1)
+      @group1.update_attribute(:name, "Poop Group")
+      key = Cacheable.association_key(user, :group)
+      Rails.cache.read(key[:key]).should be_nil
       user.cached_group.should == @group1
-      Rails.cache.read("users/#{user.id}/association/group").should == @group1
+      Rails.cache.read(key[:key]).should == [Cacheable.instance_key(Group, @group1.id)]
     end
   end
 end

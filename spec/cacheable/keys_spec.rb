@@ -33,7 +33,7 @@ describe Cacheable do
 		end
 
 		it "should generate an all w/ attribute key" do
-			expected_key = {type: :association, key: Cacheable.model_prefix(User) + "/all/login/pathouse"}
+			expected_key = {type: :object, key: Cacheable.model_prefix(User) + "/all/login/pathouse"}
 			att_key = Cacheable.attribute_key(User, :login, ['pathouse'], all: true)
 			att_key.should == expected_key
 		end
